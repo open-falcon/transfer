@@ -2,12 +2,13 @@ package sender
 
 import (
 	"fmt"
+	"log"
+
 	cmodel "github.com/open-falcon/common/model"
 	"github.com/open-falcon/transfer/g"
 	"github.com/open-falcon/transfer/proc"
 	cpool "github.com/open-falcon/transfer/sender/conn_pool"
 	nlist "github.com/toolkits/container/list"
-	"log"
 )
 
 const (
@@ -51,6 +52,8 @@ func Start() {
 
 // 将数据 打入 某个Judge的发送缓存队列, 具体是哪一个Judge 由一致性哈希 决定
 func Push2JudgeSendQueue(items []*cmodel.MetaData) {
+	cfg := g.Config().Judge
+
 	for _, item := range items {
 		pk := item.PK()
 		node, err := JudgeNodeRing.GetNode(pk)
@@ -74,11 +77,17 @@ func Push2JudgeSendQueue(items []*cmodel.MetaData) {
 			JudgeType: item.CounterType,
 			Tags:      item.Tags,
 		}
-		Q := JudgeQueues[node]
-		isSuccess := Q.PushFront(judgeItem)
+		cnode := cfg.Cluster2[node]
+		errCnt := 0
+		for _, addr := range cnode.Addrs {
+			Q := JudgeQueues[node+addr]
+			if !Q.PushFront(judgeItem) {
+				errCnt += 1
+			}
+		}
 
 		// statistics
-		if !isSuccess {
+		if errCnt > 0 {
 			proc.SendToJudgeDropCnt.Incr()
 		}
 	}

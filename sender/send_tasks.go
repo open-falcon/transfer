@@ -88,10 +88,6 @@ func forward2JudgeTask(Q *list.SafeListLimited, node string, addr string, concur
 				time.Sleep(time.Millisecond * 10)
 			}
 
-			if g.Config().Debug {
-				log.Printf("send judge :%s data count: %v", addr, count)
-			}
-
 			// statistics
 			if !sendOk {
 				log.Printf("send judge %s:%s fail: %v", node, addr, err)
