@@ -29,9 +29,11 @@ func startSendTasks() {
 	}
 
 	// init send go-routines
-	for node, _ := range cfg.Judge.Cluster {
-		queue := JudgeQueues[node]
-		go forward2JudgeTask(queue, node, judgeConcurrent)
+	for node, nitem := range cfg.Judge.Cluster2 {
+		for _, addr := range nitem.Addrs {
+			queue := JudgeQueues[node+addr]
+			go forward2JudgeTask(queue, node, addr, judgeConcurrent)
+		}
 	}
 
 	for node, nitem := range cfg.Graph.Cluster2 {
@@ -52,9 +54,8 @@ func startSendTasks() {
 }
 
 // Judge定时任务, 将 Judge发送缓存中的数据 通过rpc连接池 发送到Judge
-func forward2JudgeTask(Q *list.SafeListLimited, node string, concurrent int) {
+func forward2JudgeTask(Q *list.SafeListLimited, node string, addr string, concurrent int) {
 	batch := g.Config().Judge.Batch // 一次发送,最多batch条数据
-	addr := g.Config().Judge.Cluster[node]
 	sema := nsema.NewSemaphore(concurrent)
 
 	for {
@@ -85,6 +86,10 @@ func forward2JudgeTask(Q *list.SafeListLimited, node string, concurrent int) {
 					break
 				}
 				time.Sleep(time.Millisecond * 10)
+			}
+
+			if g.Config().Debug {
+				log.Printf("send judge :%s data count: %v", addr, count)
 			}
 
 			// statistics

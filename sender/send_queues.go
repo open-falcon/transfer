@@ -7,9 +7,11 @@ import (
 
 func initSendQueues() {
 	cfg := g.Config()
-	for node, _ := range cfg.Judge.Cluster {
-		Q := nlist.NewSafeListLimited(DefaultSendQueueMaxSize)
-		JudgeQueues[node] = Q
+	for node, nitem := range cfg.Judge.Cluster2 {
+		for _, addr := range nitem.Addrs {
+			Q := nlist.NewSafeListLimited(DefaultSendQueueMaxSize)
+			JudgeQueues[node+addr] = Q
+		}
 	}
 
 	for node, nitem := range cfg.Graph.Cluster2 {
