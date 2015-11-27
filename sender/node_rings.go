@@ -10,6 +10,15 @@ func initNodeRings() {
 
 	JudgeNodeRing = newConsistentHashNodesRing(cfg.Judge.Replicas, KeysOfMap(cfg.Judge.Cluster))
 	GraphNodeRing = newConsistentHashNodesRing(cfg.Graph.Replicas, KeysOfMap(cfg.Graph.Cluster))
+	if cfg.Drrs.Enabled {
+		if drrs_master_list != nil {
+			DrrsNodeRing = newConsistentHashNodesRing(cfg.Drrs.Replicas, drrs_master_list)
+		} else {
+			DrrsNodeRing = nil
+		}
+	} else {
+		DrrsNodeRing = nil
+	}
 	if cfg.Graph.Migrating && cfg.Graph.ClusterMigrating != nil {
 		GraphMigratingNodeRing = newConsistentHashNodesRing(cfg.Graph.Replicas, KeysOfMap(cfg.Graph.ClusterMigrating))
 	}

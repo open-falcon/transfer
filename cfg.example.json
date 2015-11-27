@@ -39,5 +39,18 @@
         },
         "clusterMigrating": {
         }
-    }
+    },
+	"drrs":{
+		"enabled": false,
+		"useZk": false,
+		"dest" : "127.0.0.1:12300",
+		"replicas": 500,
+		"maxIdle" : 32,
+		"batch" : 200,
+		"zk": {
+			"ip" : "10.9.0.130",
+			"addr": "/drrs_master",
+			"timeout" : 10
+		}
+	}
 }

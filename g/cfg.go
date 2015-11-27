@@ -53,6 +53,22 @@ type GraphConfig struct {
 	ClusterMigrating2 map[string]*ClusterNode `json:"clusterMigrating2"`
 }
 
+type ZkConfig struct { //drrs
+	Ip      string `json:"ip"`
+	Addr    string `json:"addr"`
+	Timeout int    `json:"timeout"`
+}
+
+type DrrsConfig struct { //drrs
+	Enabled  bool      `json:"enabled"`
+	UseZk    bool      `json:"useZk"`
+	Dest     string    `json:"dest"`
+	Replicas int       `json:"replicas"`
+	MaxIdle  int       `json:"maxIdle"`
+	Batch    int       `json:"batch"`
+	Zk       *ZkConfig `json:"zk"`
+}
+
 type GlobalConfig struct {
 	Debug  bool          `json:"debug"`
 	Http   *HttpConfig   `json:"http"`
@@ -60,6 +76,7 @@ type GlobalConfig struct {
 	Socket *SocketConfig `json:"socket"`
 	Judge  *JudgeConfig  `json:"judge"`
 	Graph  *GraphConfig  `json:"graph"`
+	Drrs   *DrrsConfig   `json:"drrs"` //drrs
 }
 
 var (

@@ -19,6 +19,7 @@ const (
 var (
 	JudgeNodeRing          *ConsistentHashNodeRing
 	GraphNodeRing          *ConsistentHashNodeRing
+	DrrsNodeRing           *ConsistentHashNodeRing //drrs
 	GraphMigratingNodeRing *ConsistentHashNodeRing
 )
 
@@ -27,6 +28,7 @@ var (
 var (
 	JudgeQueues          = make(map[string]*nlist.SafeListLimited)
 	GraphQueues          = make(map[string]*nlist.SafeListLimited)
+	DrrsQueues           = make(map[string]*nlist.SafeListLimited) //drrs
 	GraphMigratingQueues = make(map[string]*nlist.SafeListLimited)
 )
 
@@ -37,6 +39,8 @@ var (
 	GraphConnPools          *cpool.SafeRpcConnPools
 	GraphMigratingConnPools *cpool.SafeRpcConnPools
 )
+
+var drrs_master_list []string //drrs
 
 // 初始化数据发送服务, 在main函数中调用
 func Start() {
@@ -143,6 +147,34 @@ func Push2GraphSendQueue(items []*cmodel.MetaData, migrating bool) {
 					proc.SendToGraphMigratingDropCnt.Incr()
 				}
 			}
+		}
+	}
+}
+
+//这里将所有的数据都打入到同一个drrs发送队列。因为有ck，ck会动态的增加删除节点，因此在create或update的时候再决定是哪个master节点进行转发。
+func Push2DrrsSendQueue(items []*cmodel.MetaData) { //drrs
+
+	for _, item := range items {
+		drrsItem, err := convert2GraphItem(item)
+		if err != nil {
+			log.Println("E:", err)
+			continue
+		}
+		//pk := item.PK()
+
+		// statistics. 为了效率,放到了这里,因此只有graph是enbale时才能trace
+		//proc.RecvDataTrace.Trace(pk, item)
+		//proc.RecvDataFilter.Filter(pk, item.Value, item)
+
+		//drrs_master, err := DrrsNodeRing.GetNode(pk)
+		//if err != nil {
+		//	log.Println("E:", err)
+		//	continue
+		//}
+		errCnt := 0
+		Q := DrrsQueues["drrs_master"]
+		if !Q.PushFront(drrsItem) {
+			errCnt += 1
 		}
 	}
 }

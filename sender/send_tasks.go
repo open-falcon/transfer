@@ -21,10 +21,14 @@ func startSendTasks() {
 	// init semaphore
 	judgeConcurrent := cfg.Judge.MaxIdle
 	graphConcurrent := cfg.Graph.MaxIdle
+	drrsConcurrent := cfg.Drrs.MaxIdle //drrs
 	if judgeConcurrent < 1 {
 		judgeConcurrent = 1
 	}
 	if graphConcurrent < 1 {
+		graphConcurrent = 1
+	}
+	if drrsConcurrent < 1 { //drrs
 		graphConcurrent = 1
 	}
 
@@ -48,6 +52,97 @@ func startSendTasks() {
 				go forward2GraphMigratingTask(queue, node, addr, graphConcurrent)
 			}
 		}
+	}
+
+	if cfg.Drrs.Enabled { //drrs
+		if drrs_master_list != nil {
+			//这里只有一个发送队列，保证zk中节点变化时数据不丢失
+			queue := DrrsQueues["drrs_master"]
+			go forward2DrrsTask(queue, drrsConcurrent)
+		}
+	}
+}
+
+func forward2DrrsTask(Q *list.SafeListLimited, concurrent int) {
+	batch := g.Config().Drrs.Batch // 一次发送,最多batch条数据
+	sema := nsema.NewSemaphore(concurrent)
+
+	for {
+		items := Q.PopBackBy(batch)
+		count := len(items)
+		if count == 0 {
+			time.Sleep(DefaultSendTaskSleepInterval)
+			continue
+		}
+
+		//这里依然使用graphitem
+		graphItems := make([]*cmodel.GraphItem, count)
+		for i := 0; i < count; i++ {
+			graphItems[i] = items[i].(*cmodel.GraphItem)
+		}
+
+		//	同步Call + 有限并发 进行发送
+		//TODO 这里还是单条发送，等drrs优化后将来改成批量发送。
+		sema.Acquire()
+		//TODO 这里先create再update，两次网络通信效率不高，待drrs优化update逻辑后进行修改
+		go func(graphItems []*cmodel.GraphItem) {
+			defer sema.Release()
+
+			for _, item := range graphItems {
+
+				checksum := item.Checksum()
+				addr, err := DrrsNodeRing.GetNode(checksum)
+				if err != nil {
+					log.Println("[DRRS ERROR] DRRS GET NODE RING ERROR:", err)
+					continue
+				}
+				filename := RrdFileName(checksum)
+				err = create(filename, item, addr)
+				if err != nil {
+					//create出错，重试两次，看是不是master挂了，尝试ck分配新的master。
+					ok := false
+					for i := 0; i < 2; i++ {
+						time.Sleep(time.Second * 10)
+						addr, err = DrrsNodeRing.GetNode(checksum)
+						if err != nil {
+							log.Println("[DRRS ERROR] DRRS GET NODE RING ERROR:", err)
+							break
+						}
+						err = create(filename, item, addr)
+						if err == nil {
+							ok = true
+							break
+						}
+					}
+					if !ok {
+						log.Println("[DRRS ERROR] rrd create error: ", err)
+						continue
+					}
+				}
+				err = update(filename, item, addr)
+				if err != nil {
+					//update出错，重试两次，看是不是master挂了，尝试ck分配新的master。
+					ok := false
+					for i := 0; i < 2; i++ {
+						time.Sleep(time.Second * 10)
+						addr, err = DrrsNodeRing.GetNode(checksum)
+						if err != nil {
+							log.Println("[DRRS ERROR] DRRS GET NODE RING ERROR:", err)
+							break
+						}
+						err = update(filename, item, addr)
+						if err == nil {
+							ok = true
+							break
+						}
+					}
+					if !ok {
+						log.Println("[DRRS ERROR] rrd create error: ", err)
+						continue
+					}
+				}
+			}
+		}(graphItems)
 	}
 }
 
