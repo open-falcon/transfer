@@ -12,6 +12,11 @@ func initSendQueues() {
 		JudgeQueues[node] = Q
 	}
 
+	if drrs_master_list != nil && len(drrs_master_list) > 0 {
+		Q := nlist.NewSafeListLimited(DefaultSendQueueMaxSize)
+		DrrsQueues["drrs_master"] = Q
+	}
+
 	for node, nitem := range cfg.Graph.Cluster2 {
 		for _, addr := range nitem.Addrs {
 			Q := nlist.NewSafeListLimited(DefaultSendQueueMaxSize)

@@ -142,6 +142,9 @@ func RecvMetricValues(args []*cmodel.MetricValue, reply *cmodel.TransferResponse
 		sender.Push2JudgeSendQueue(items)
 	}
 
+	if cfg.Drrs.Enabled { //drrs
+		sender.Push2DrrsSendQueue(items)
+	}
 	reply.Message = "ok"
 	reply.Total = len(args)
 	reply.Latency = (time.Now().UnixNano() - start.UnixNano()) / 1000000
