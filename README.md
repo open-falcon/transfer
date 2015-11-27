@@ -93,7 +93,8 @@ u want sending items via java jsonrpc client? turn to one java example: [jsonrpc
         - maxConns: 连接池相关配置，最大连接数，建议保持默认
         - maxIdle: 连接池相关配置，最大空闲连接数，建议保持默认
         - replicas: 这是一致性hash算法需要的节点副本数量，建议不要变更，保持默认即可
-        - cluster: key-value形式的字典，表示后端的judge列表，其中key代表后端judge名字，value代表的是具体的ip:port
+        - cluster: key-value形式的字典，表示后端的judge列表，其中key代表后端judge名字，value代表的是具体的ip:port(多个地址 用逗号隔开, transfer会将同一份数据 发送至各个地址)
+
 
     graph
         - enable: true/false, 表示是否开启向graph发送数据
