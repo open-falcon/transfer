@@ -25,7 +25,7 @@ type SocketConfig struct {
 	Timeout int    `json:"timeout"`
 }
 
-type StatsdConfig struct {
+type StatsDConfig struct {
 	Enabled  bool   `json:"enabled"`
 	Listen   string `json:"listen"`
 	Interval int64  `json:"interval"`
@@ -80,7 +80,7 @@ type GlobalConfig struct {
 	Judge  *JudgeConfig  `json:"judge"`
 	Graph  *GraphConfig  `json:"graph"`
 	Tsdb   *TsdbConfig   `json:"tsdb"`
-	Statsd *StatsdConfig `json:"statsd"`
+	StatsD *StatsDConfig `json:"statsd"`
 }
 
 var (
