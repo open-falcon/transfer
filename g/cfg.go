@@ -2,10 +2,11 @@ package g
 
 import (
 	"encoding/json"
-	"github.com/toolkits/file"
 	"log"
 	"strings"
 	"sync"
+
+	"github.com/toolkits/file"
 )
 
 type HttpConfig struct {
@@ -22,6 +23,13 @@ type SocketConfig struct {
 	Enabled bool   `json:"enabled"`
 	Listen  string `json:"listen"`
 	Timeout int    `json:"timeout"`
+}
+
+type StatsDConfig struct {
+	Enabled  bool   `json:"enabled"`
+	Listen   string `json:"listen"`
+	Interval int64  `json:"interval"`
+	Percent  int    `json:"percent"`
 }
 
 type JudgeConfig struct {
@@ -72,6 +80,7 @@ type GlobalConfig struct {
 	Judge  *JudgeConfig  `json:"judge"`
 	Graph  *GraphConfig  `json:"graph"`
 	Tsdb   *TsdbConfig   `json:"tsdb"`
+	StatsD *StatsDConfig `json:"statsd"`
 }
 
 var (
