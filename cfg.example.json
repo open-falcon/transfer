@@ -13,6 +13,12 @@
         "listen": "0.0.0.0:4444",
         "timeout": 3600
     },
+    "statsd": {
+        "enabled": true,
+        "listen": "0.0.0.0:8125",
+        "interval": 30,
+        "percent": 90
+    },
     "judge": {
         "enabled": true,
         "batch": 200,
