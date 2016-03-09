@@ -2,10 +2,10 @@ package sender
 
 import (
 	"fmt"
+	cmodel "github.com/open-falcon/common/model"
 	"github.com/open-falcon/transfer/g"
 	"github.com/open-falcon/transfer/proc"
 	cpool "github.com/open-falcon/transfer/sender/conn_pool"
-	cmodel "github.com/open-falcon/common/model"
 	nlist "github.com/toolkits/container/list"
 	"log"
 )
@@ -205,8 +205,8 @@ func Push2InfluxdbSendQueue(items []*cmodel.MetaData) {
 	for _, item := range items {
 		// align ts
 		step := int(item.Step)
-		if step < g.MIN_STEP {
-			step = g.MIN_STEP
+		if step < MinStep {
+			step = MinStep
 		}
 		ts := alignTs(item.Timestamp, int64(step))
 
