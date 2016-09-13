@@ -2,9 +2,9 @@ package sender
 
 import (
 	"bytes"
-	cmodel "github.com/open-falcon/common/model"
 	"github.com/open-falcon/transfer/g"
 	"github.com/open-falcon/transfer/proc"
+	cmodel "github.com/open-falcon/common/model"
 	nsema "github.com/toolkits/concurrent/semaphore"
 	"github.com/toolkits/container/list"
 	"log"
@@ -23,6 +23,7 @@ func startSendTasks() {
 	judgeConcurrent := cfg.Judge.MaxConns
 	graphConcurrent := cfg.Graph.MaxConns
 	tsdbConcurrent := cfg.Tsdb.MaxConns
+	influxdbConcurrent := cfg.Influxdb.MaxIdle
 
 	if tsdbConcurrent < 1 {
 		tsdbConcurrent = 1
@@ -34,6 +35,9 @@ func startSendTasks() {
 
 	if graphConcurrent < 1 {
 		graphConcurrent = 1
+	}
+	if influxdbConcurrent < 1 {
+		influxdbConcurrent = 1
 	}
 
 	// init send go-routines
@@ -52,6 +56,8 @@ func startSendTasks() {
 	if cfg.Tsdb.Enabled {
 		go forward2TsdbTask(tsdbConcurrent)
 	}
+
+	go forward2InfluxdbTask(InfluxdbQueues["default"], influxdbConcurrent)
 }
 
 // Judge定时任务, 将 Judge发送缓存中的数据 通过rpc连接池 发送到Judge
@@ -186,5 +192,58 @@ func forward2TsdbTask(concurrent int) {
 				return
 			}
 		}(items)
+	}
+}
+
+// Influxdb schedule
+func forward2InfluxdbTask(Q *list.SafeListLimited, concurrent int) {
+	cfg := g.Config().Influxdb
+	batch := cfg.Batch // 一次发送,最多batch条数据
+	conn, err := parseDSN(cfg.Address)
+	if err != nil {
+		log.Print("syntax of influxdb address is wrong")
+		return
+	}
+	addr := conn.Address
+
+	sema := nsema.NewSemaphore(concurrent)
+
+	for {
+		items := Q.PopBackBy(batch)
+		count := len(items)
+		if count == 0 {
+			time.Sleep(DefaultSendTaskSleepInterval)
+			continue
+		}
+
+		influxdbItems := make([]*cmodel.JudgeItem, count)
+		for i := 0; i < count; i++ {
+			influxdbItems[i] = items[i].(*cmodel.JudgeItem)
+		}
+
+		//	同步Call + 有限并发 进行发送
+		sema.Acquire()
+		go func(addr string, influxdbItems []*cmodel.JudgeItem, count int) {
+			defer sema.Release()
+
+			var err error
+			sendOk := false
+			for i := 0; i < 3; i++ { //最多重试3次
+				err = InfluxdbConnPools.Call(addr, influxdbItems)
+				if err == nil {
+					sendOk = true
+					break
+				}
+				time.Sleep(time.Millisecond * 10)
+			}
+
+			// statistics
+			if !sendOk {
+				log.Printf("send influxdb %s fail: %v", addr, err)
+				proc.SendToInfluxdbFailCnt.IncrBy(int64(count))
+			} else {
+				proc.SendToInfluxdbCnt.IncrBy(int64(count))
+			}
+		}(addr, influxdbItems, count)
 	}
 }

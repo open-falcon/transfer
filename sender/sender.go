@@ -29,9 +29,10 @@ var (
 // 发送缓存队列
 // node -> queue_of_data
 var (
-	TsdbQueue   *nlist.SafeListLimited
-	JudgeQueues = make(map[string]*nlist.SafeListLimited)
-	GraphQueues = make(map[string]*nlist.SafeListLimited)
+	TsdbQueue      *nlist.SafeListLimited
+	JudgeQueues    = make(map[string]*nlist.SafeListLimited)
+	GraphQueues    = make(map[string]*nlist.SafeListLimited)
+	InfluxdbQueues = make(map[string]*nlist.SafeListLimited)
 )
 
 // 连接池
@@ -40,6 +41,7 @@ var (
 	JudgeConnPools     *cpool.SafeRpcConnPools
 	TsdbConnPoolHelper *cpool.TsdbConnPoolHelper
 	GraphConnPools     *cpool.SafeRpcConnPools
+	InfluxdbConnPools  *cpool.InfluxdbConnPools
 )
 
 // 初始化数据发送服务, 在main函数中调用
@@ -196,4 +198,32 @@ func convert2TsdbItem(d *cmodel.MetaData) *cmodel.TsdbItem {
 
 func alignTs(ts int64, period int64) int64 {
 	return ts - ts%period
+}
+
+// Push data to 3rd-party database
+func Push2InfluxdbSendQueue(items []*cmodel.MetaData) {
+	for _, item := range items {
+		// align ts
+		step := int(item.Step)
+		if step < MinStep {
+			step = MinStep
+		}
+		ts := alignTs(item.Timestamp, int64(step))
+
+		influxdbItem := &cmodel.JudgeItem{
+			Endpoint:  item.Endpoint,
+			Metric:    item.Metric,
+			Value:     item.Value,
+			Timestamp: ts,
+			JudgeType: item.CounterType,
+			Tags:      item.Tags,
+		}
+		Q := InfluxdbQueues["default"]
+		isSuccess := Q.PushFront(influxdbItem)
+
+		// statistics
+		if !isSuccess {
+			proc.SendToInfluxdbDropCnt.Incr()
+		}
+	}
 }

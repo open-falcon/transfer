@@ -22,4 +22,7 @@ func initSendQueues() {
 	if cfg.Tsdb.Enabled {
 		TsdbQueue = nlist.NewSafeListLimited(DefaultSendQueueMaxSize)
 	}
+
+	Q := nlist.NewSafeListLimited(DefaultSendQueueMaxSize)
+	InfluxdbQueues["default"] = Q
 }
