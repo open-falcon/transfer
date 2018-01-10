@@ -22,4 +22,8 @@ func initSendQueues() {
 	if cfg.Tsdb.Enabled {
 		TsdbQueue = nlist.NewSafeListLimited(DefaultSendQueueMaxSize)
 	}
+	
+		if cfg.Kafka.Enabled {
+		KafkaQueue = nlist.NewSafeListLimited(DefaultSendQueueMaxSize)
+	}
 }

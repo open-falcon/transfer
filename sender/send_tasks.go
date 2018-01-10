@@ -2,6 +2,7 @@ package sender
 
 import (
 	"bytes"
+	"encoding/json"
 	cmodel "github.com/open-falcon/common/model"
 	"github.com/open-falcon/transfer/g"
 	"github.com/open-falcon/transfer/proc"
@@ -23,6 +24,11 @@ func startSendTasks() {
 	judgeConcurrent := cfg.Judge.MaxConns
 	graphConcurrent := cfg.Graph.MaxConns
 	tsdbConcurrent := cfg.Tsdb.MaxConns
+	//	kafkaConcurrent := cfg.Kafka.MaxConns
+	//
+	//	if kafkaConcurrent < 1 {
+	//		kafkaConcurrent = 1
+	//	}
 
 	if tsdbConcurrent < 1 {
 		tsdbConcurrent = 1
@@ -51,6 +57,10 @@ func startSendTasks() {
 
 	if cfg.Tsdb.Enabled {
 		go forward2TsdbTask(tsdbConcurrent)
+	}
+
+	if cfg.Kafka.Enabled {
+		go forward2KafkaTask()
 	}
 }
 
@@ -143,6 +153,47 @@ func forward2GraphTask(Q *list.SafeListLimited, node string, addr string, concur
 				proc.SendToGraphCnt.IncrBy(int64(count))
 			}
 		}(addr, graphItems, count)
+	}
+}
+
+// Kafka定时任务, 将数据通过api发送到kafka
+func forward2KafkaTask() {
+	//TODO KAFKA
+	batch := g.Config().Kafka.Batch // 一次发送,最多batch条数据
+	retry := g.Config().Kafka.MaxRetry
+	topic := g.Config().Kafka.Topic
+
+	for {
+		items := KafkaQueue.PopBackBy(batch)
+		if len(items) == 0 {
+			time.Sleep(DefaultSendTaskSleepInterval)
+			continue
+		}
+		//  同步有限并发 进行发送
+		go func(itemList []interface{}) {
+			for i := 0; i < len(itemList); i++ {
+				for i := 0; i < retry; i++ {
+					msg, err := json.Marshal(itemList[i])
+					if err != nil {
+						log.Fatalln("data json decode err")
+						break
+					}
+					err = KafkaConnPoolHelper.Send(msg, topic, 0)
+					if err == nil {
+						proc.SendToKafkaCnt.IncrBy(int64(len(itemList)))
+						break
+					}
+
+					time.Sleep(100 * time.Millisecond)
+					if err != nil {
+						proc.SendToKafkaFailCnt.IncrBy(int64(len(itemList)))
+						log.Fatalln(err)
+					}
+
+				}
+			}
+		}(items)
+
 	}
 }
 
