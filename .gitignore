@@ -28,6 +28,7 @@ _testmain.go
 *.log
 .idea
 .DS_Store
+_codesync
 /var
 /falcon-transfer*
 /cfg.json

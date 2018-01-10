@@ -192,7 +192,6 @@ func newTsdbConnPool(address string, maxConns int, maxIdle int, connTimeout int)
 }
 
 func newKafkaConnPool(address string, maxConns int, connTimeout int, writeTimeout int) sarama.SyncProducer {
-	//TODO kafka
 	kafka_config := sarama.NewConfig()
 	kafka_config.Net.MaxOpenRequests = maxConns
 	kafka_config.Net.DialTimeout = time.Duration(connTimeout) * time.Millisecond

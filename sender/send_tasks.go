@@ -24,11 +24,11 @@ func startSendTasks() {
 	judgeConcurrent := cfg.Judge.MaxConns
 	graphConcurrent := cfg.Graph.MaxConns
 	tsdbConcurrent := cfg.Tsdb.MaxConns
-	//	kafkaConcurrent := cfg.Kafka.MaxConns
-	//
-	//	if kafkaConcurrent < 1 {
-	//		kafkaConcurrent = 1
-	//	}
+	kafkaConcurrent := cfg.Kafka.MaxConns
+
+	if kafkaConcurrent < 1 {
+		kafkaConcurrent = 1
+	}
 
 	if tsdbConcurrent < 1 {
 		tsdbConcurrent = 1
@@ -60,7 +60,7 @@ func startSendTasks() {
 	}
 
 	if cfg.Kafka.Enabled {
-		go forward2KafkaTask()
+		go forward2KafkaTask(kafkaConcurrent)
 	}
 }
 
@@ -157,12 +157,11 @@ func forward2GraphTask(Q *list.SafeListLimited, node string, addr string, concur
 }
 
 // Kafka定时任务, 将数据通过api发送到kafka
-func forward2KafkaTask() {
-	//TODO KAFKA
+func forward2KafkaTask(concurrent int) {
 	batch := g.Config().Kafka.Batch // 一次发送,最多batch条数据
 	retry := g.Config().Kafka.MaxRetry
 	topic := g.Config().Kafka.Topic
-
+	sema := nsema.NewSemaphore(concurrent)
 	for {
 		items := KafkaQueue.PopBackBy(batch)
 		if len(items) == 0 {
@@ -170,9 +169,11 @@ func forward2KafkaTask() {
 			continue
 		}
 		//  同步有限并发 进行发送
+		sema.Acquire()
 		go func(itemList []interface{}) {
+			defer sema.Release()
 			for i := 0; i < len(itemList); i++ {
-				for i := 0; i < retry; i++ {
+				for j := 0; j < retry; j++ {
 					msg, err := json.Marshal(itemList[i])
 					if err != nil {
 						log.Fatalln("data json decode err")
