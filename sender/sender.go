@@ -29,6 +29,7 @@ var (
 // 发送缓存队列
 // node -> queue_of_data
 var (
+    KafkaQueue   *nlist.SafeListLimited
 	TsdbQueue   *nlist.SafeListLimited
 	JudgeQueues = make(map[string]*nlist.SafeListLimited)
 	GraphQueues = make(map[string]*nlist.SafeListLimited)
@@ -39,6 +40,7 @@ var (
 var (
 	JudgeConnPools     *cpool.SafeRpcConnPools
 	TsdbConnPoolHelper *cpool.TsdbConnPoolHelper
+	KafkaConnPoolHelper *cpool.KafkaConnPoolHelper
 	GraphConnPools     *cpool.SafeRpcConnPools
 )
 
@@ -176,6 +178,17 @@ func Push2TsdbSendQueue(items []*cmodel.MetaData) {
 
 		if !isSuccess {
 			proc.SendToTsdbDropCnt.Incr()
+		}
+	}
+}
+
+// 将原始数据入到kafka发送缓存队列
+func Push2KafkaSendQueue(items []*cmodel.MetaData) {
+	for _, item := range items {
+		isSuccess := KafkaQueue.PushFront(item)
+
+		if !isSuccess {
+			proc.SendToKafkaDropCnt.Incr()
 		}
 	}
 }
